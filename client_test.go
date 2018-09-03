@@ -21,6 +21,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -76,10 +77,22 @@ func TestMain(m *testing.M) {
 	if !noDaemon {
 		sys.ForceRemoveAll(defaultRoot)
 
-		err := ctrd.start("containerd", address, []string{
+		configFile, err := ioutil.TempFile("", "")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v", "Failed to create config file", err)
+			os.Exit(1)
+		}
+
+		if err := ioutil.WriteFile(configFile.Name(), []byte("[plugins.linux]\n\tshim_debug = true"), 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v", "Failed to write config file", err)
+			os.Exit(1)
+		}
+
+		err = ctrd.start("containerd", address, []string{
 			"--root", defaultRoot,
 			"--state", defaultState,
 			"--log-level", "debug",
+			"--config", configFile.Name(),
 		}, buf, buf)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", err, buf.String())
